@@ -1,11 +1,12 @@
+use std::io;
 use std::sync::Arc;
 
 use iced::executor;
 use iced::font::{self, Font};
-use iced::widget::{button, column, container, Image};
+use iced::widget::{button, column, container, text, Image};
 use iced::{Application, Command, Element, Length, Settings, Theme};
 use iced_aw::{TabBar, TabBarStyles, TabLabel};
-use map::{pick_and_load_images, Error};
+use map::pick_and_load_images;
 
 mod map;
 
@@ -15,11 +16,17 @@ pub fn main() -> iced::Result {
     Imaged::run(Settings::default())
 }
 
+#[derive(Debug, Clone)]
+pub enum Error {
+    DialogClosed,
+    IO(io::ErrorKind),
+}
+
 #[derive(PartialEq, Hash, Clone, Copy, Debug, Eq, Default)]
 enum TabId {
     #[default]
-    One,
-    Two,
+    Encrypt,
+    Decrypt,
 }
 
 enum ImageType {
@@ -95,8 +102,8 @@ impl Application for Imaged {
 
     fn view(&self) -> Element<Message> {
         let tab_bar = TabBar::new(Message::TabSelected)
-            .push(TabId::One, TabLabel::Text(String::from("Encrypt")))
-            .push(TabId::Two, TabLabel::Text(String::from("Decrypt")))
+            .push(TabId::Encrypt, TabLabel::Text(String::from("Encrypt")))
+            .push(TabId::Decrypt, TabLabel::Text(String::from("Decrypt")))
             .set_active_tab(&self.tab_index)
             .style(TabBarStyles::Dark);
 
@@ -105,7 +112,8 @@ impl Application for Imaged {
             .width(Length::Fill);
 
         let pick_file_btn = button("Open files").on_press(Message::OpenFileDialog);
-        let page = container(column![image, pick_file_btn]).height(Length::Fill);
+        let text = text(format!("{:?}", self.images));
+        let page = container(column![image, pick_file_btn, text]).height(Length::Fill);
 
         let content = column![tab_bar, page].spacing(22);
 

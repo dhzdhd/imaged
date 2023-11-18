@@ -1,16 +1,8 @@
-use std::{
-    io::{self},
-    path::Path,
-    sync::Arc,
-};
+use std::{path::Path, sync::Arc};
 
 use rfd::FileHandle;
 
-#[derive(Debug, Clone)]
-pub enum Error {
-    DialogClosed,
-    IO(io::ErrorKind),
-}
+use crate::Error;
 
 pub async fn pick_and_load_images() -> Result<Arc<Vec<u8>>, Error> {
     let files = pick_files().await?;
