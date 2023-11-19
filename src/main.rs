@@ -3,9 +3,11 @@ use std::sync::Arc;
 
 use iced::executor;
 use iced::font::{self, Font};
-use iced::widget::{button, column, container, text, Image};
+use iced::widget::image::Handle;
+use iced::widget::{button, column, container, text, Column, Image, Row, Scrollable};
 use iced::{Application, Command, Element, Length, Settings, Theme};
 use iced_aw::{TabBar, TabBarStyles, TabLabel};
+use image::{DynamicImage, RgbaImage};
 use map::pick_and_load_images;
 
 mod map;
@@ -19,6 +21,7 @@ pub fn main() -> iced::Result {
 #[derive(Debug, Clone)]
 pub enum Error {
     DialogClosed,
+    ImageDecode,
     IO(io::ErrorKind),
 }
 
@@ -29,14 +32,15 @@ enum TabId {
     Decrypt,
 }
 
-enum ImageType {
-    Encode,
-    Decode,
+#[derive(Debug)]
+struct ImageData {
+    image_type: TabId,
+    data: DynamicImage,
 }
 
 struct Imaged {
     tab_index: TabId,
-    images: Vec<u8>,
+    images: Option<Vec<ImageData>>,
     error: Option<Error>,
 }
 
@@ -45,14 +49,14 @@ enum Message {
     FontLoaded(Result<(), font::Error>),
     TabSelected(TabId),
     OpenFileDialog,
-    FilesOpened(Result<Arc<Vec<u8>>, Error>),
+    FilesOpened(Result<Arc<Vec<DynamicImage>>, Error>),
 }
 
 impl Default for Imaged {
     fn default() -> Self {
         Self {
             tab_index: TabId::default(),
-            images: Vec::new(),
+            images: None,
             error: None,
         }
     }
@@ -90,9 +94,19 @@ impl Application for Imaged {
             Message::OpenFileDialog => {
                 Command::perform(pick_and_load_images(), |res| Message::FilesOpened(res))
             }
-            Message::FilesOpened(files) => {
-                match files {
-                    Ok(f) => self.images = f.to_vec(),
+            Message::FilesOpened(images_res) => {
+                match images_res {
+                    Ok(images) => {
+                        self.images = Some(
+                            images
+                                .iter()
+                                .map(|image| ImageData {
+                                    image_type: self.tab_index,
+                                    data: image.clone(),
+                                })
+                                .collect(),
+                        )
+                    }
                     Err(e) => self.error = Some(e),
                 }
                 Command::none()
@@ -107,15 +121,42 @@ impl Application for Imaged {
             .set_active_tab(&self.tab_index)
             .style(TabBarStyles::Dark);
 
-        let image = Image::new("assets/images/image.png")
-            .height(Length::Fill)
-            .width(Length::Fill);
+        let image_view = {
+            let mut column = Row::new();
+            match &self.images {
+                Some(images) => {
+                    for image in images {
+                        let bytes = image.data.clone();
+                        let image = Image::new(Handle::from_pixels(
+                            bytes.width(),
+                            bytes.height(),
+                            bytes.to_rgba8().to_vec(),
+                        ))
+                        .height(Length::Fill)
+                        .width(Length::Fill);
+                        column = column.push(image);
+                    }
+                }
+                None => {
+                    column = column.push(text("No images selected"));
+                }
+            }
+
+            // Scrollable::new(column)
+            column
+        };
 
         let pick_file_btn = button("Open files").on_press(Message::OpenFileDialog);
-        let text = text(format!("{:?}", self.images));
-        let page = container(column![image, pick_file_btn, text]).height(Length::Fill);
 
-        let content = column![tab_bar, page].spacing(22);
+        let page = container(column![image_view]).height(Length::Fill);
+
+        let error_text = text(
+            self.error
+                .clone()
+                .and_then(|e| Some(format!("{:?}", e)))
+                .unwrap_or("No error".to_owned()),
+        );
+        let content = column![tab_bar, pick_file_btn, page, error_text].spacing(22);
 
         container(content)
             .width(Length::Fill)
