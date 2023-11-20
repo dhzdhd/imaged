@@ -5,17 +5,17 @@ use std::sync::Arc;
 use iced::alignment::{Horizontal, Vertical};
 use iced::font::{self, Font};
 use iced::widget::image::Handle;
-use iced::widget::{button, column, container, text, Column, Image, Row, Scrollable};
+use iced::widget::{button, column, container, text, Image, Row};
 use iced::{executor, Alignment};
 use iced::{Application, Command, Element, Length, Settings, Theme};
 use iced_aw::{TabBar, TabBarStyles, TabLabel};
-use image::{DynamicImage, RgbaImage};
+use image::DynamicImage;
 use load::pick_and_load_images;
 
 mod load;
 mod manipulate;
 
-const ICON_FONT: Font = Font::with_name("icons");
+const _ICON_FONT: Font = Font::with_name("icons");
 
 pub fn main() -> iced::Result {
     Imaged::run(Settings::default())
@@ -53,6 +53,7 @@ struct ImageData {
     data: DynamicImage,
 }
 
+#[derive(Default)]
 struct Imaged {
     tab_index: TabId,
     images: Option<Vec<ImageData>>,
@@ -65,16 +66,6 @@ enum Message {
     TabSelected(TabId),
     OpenFileDialog,
     FilesOpened(Result<Arc<Vec<DynamicImage>>, Error>),
-}
-
-impl Default for Imaged {
-    fn default() -> Self {
-        Self {
-            tab_index: TabId::default(),
-            images: None,
-            error: None,
-        }
-    }
 }
 
 impl Application for Imaged {
@@ -107,7 +98,7 @@ impl Application for Imaged {
                 Command::none()
             }
             Message::OpenFileDialog => {
-                Command::perform(pick_and_load_images(), |res| Message::FilesOpened(res))
+                Command::perform(pick_and_load_images(), Message::FilesOpened)
             }
             Message::FilesOpened(images_res) => {
                 match images_res {
@@ -149,15 +140,17 @@ impl Application for Imaged {
             match &self.images {
                 Some(images) => {
                     for image in images {
-                        let bytes = image.data.clone();
-                        let image = Image::new(Handle::from_pixels(
-                            bytes.width(),
-                            bytes.height(),
-                            bytes.to_rgba8().to_vec(),
-                        ))
-                        .height(Length::Fill)
-                        .width(Length::Fill);
-                        row = row.push(image);
+                        if self.tab_index == image.image_type {
+                            let bytes = image.data.clone();
+                            let image = Image::new(Handle::from_pixels(
+                                bytes.width(),
+                                bytes.height(),
+                                bytes.to_rgba8().to_vec(),
+                            ))
+                            .height(Length::Fill)
+                            .width(Length::Fill);
+                            row = row.push(image);
+                        }
                     }
                 }
                 None => {
@@ -176,7 +169,7 @@ impl Application for Imaged {
         let error_text = container(text(
             self.error
                 .clone()
-                .and_then(|e| Some(format!("{}", e)))
+                .map(|e| format!("{}", e))
                 .unwrap_or("No error".to_owned()),
         ))
         .padding(10);
