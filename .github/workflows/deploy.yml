@@ -10,7 +10,8 @@ on:
     types:
       - completed
 
-permissions: write
+permissions:
+  actions: write
 
 jobs:
   release:
