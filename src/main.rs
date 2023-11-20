@@ -1,16 +1,19 @@
+use std::fmt::{Debug, Display};
 use std::io;
 use std::sync::Arc;
 
-use iced::executor;
+use iced::alignment::{Horizontal, Vertical};
 use iced::font::{self, Font};
 use iced::widget::image::Handle;
 use iced::widget::{button, column, container, text, Column, Image, Row, Scrollable};
+use iced::{executor, Alignment};
 use iced::{Application, Command, Element, Length, Settings, Theme};
 use iced_aw::{TabBar, TabBarStyles, TabLabel};
 use image::{DynamicImage, RgbaImage};
-use map::pick_and_load_images;
+use load::pick_and_load_images;
 
-mod map;
+mod load;
+mod manipulate;
 
 const ICON_FONT: Font = Font::with_name("icons");
 
@@ -23,6 +26,18 @@ pub enum Error {
     DialogClosed,
     ImageDecode,
     IO(io::ErrorKind),
+}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let literal = match self {
+            Error::DialogClosed => "Dialog closed",
+            Error::ImageDecode => "Image decode failed",
+            _ => "Error",
+        };
+
+        write!(f, "Error | {}", literal)
+    }
 }
 
 #[derive(PartialEq, Hash, Clone, Copy, Debug, Eq, Default)]
@@ -121,8 +136,16 @@ impl Application for Imaged {
             .set_active_tab(&self.tab_index)
             .style(TabBarStyles::Dark);
 
+        let pick_file_btn = button("Open files").on_press(Message::OpenFileDialog);
+        let encrypt_btn = button(match self.tab_index {
+            TabId::Encrypt => "Encrypt",
+            TabId::Decrypt => "Decrypt",
+        })
+        .on_press_maybe(None);
+        let button_bar = Row::new().push(pick_file_btn).push(encrypt_btn).spacing(10);
+
         let image_view = {
-            let mut column = Row::new();
+            let mut row = Row::new();
             match &self.images {
                 Some(images) => {
                     for image in images {
@@ -134,29 +157,33 @@ impl Application for Imaged {
                         ))
                         .height(Length::Fill)
                         .width(Length::Fill);
-                        column = column.push(image);
+                        row = row.push(image);
                     }
                 }
                 None => {
-                    column = column.push(text("No images selected"));
+                    row = row.push(text("No images selected"));
                 }
             }
 
-            // Scrollable::new(column)
-            column
+            // Scrollable::new(row)
+            row.align_items(Alignment::Center).spacing(5)
         };
+        let page = container(column![image_view])
+            .height(Length::Fill)
+            .align_x(Horizontal::Center)
+            .align_y(Vertical::Center);
 
-        let pick_file_btn = button("Open files").on_press(Message::OpenFileDialog);
-
-        let page = container(column![image_view]).height(Length::Fill);
-
-        let error_text = text(
+        let error_text = container(text(
             self.error
                 .clone()
-                .and_then(|e| Some(format!("{:?}", e)))
+                .and_then(|e| Some(format!("{}", e)))
                 .unwrap_or("No error".to_owned()),
-        );
-        let content = column![tab_bar, pick_file_btn, page, error_text].spacing(22);
+        ))
+        .padding(10);
+
+        let content = column![tab_bar, button_bar, page, error_text]
+            .spacing(22)
+            .align_items(Alignment::Center);
 
         container(content)
             .width(Length::Fill)
