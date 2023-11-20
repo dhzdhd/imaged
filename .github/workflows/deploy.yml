@@ -1,0 +1,25 @@
+name: Deploy executable
+
+on:
+  push:
+    branches: [ "stable" ]
+  pull_request:
+    branches: [ "stable" ]
+  workflow_run:
+    workflows: ["Build, lint and test"]
+    types:
+      - completed
+
+permissions: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - uses: manoadamro/rust-release@v1
+        with:
+          owner: ${{ github.repository_owner }}
+          repo: ${{ github.repository }}
+          token: ${{ secrets.GITHUB_TOKEN }}
