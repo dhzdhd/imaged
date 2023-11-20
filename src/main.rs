@@ -5,10 +5,10 @@ use std::sync::Arc;
 use iced::alignment::{Horizontal, Vertical};
 use iced::font::{self, Font};
 use iced::widget::image::Handle;
-use iced::widget::{button, column, container, text, Image, Row};
+use iced::widget::{button, column, container, text, Image, Row, TextInput};
 use iced::{executor, Alignment};
 use iced::{Application, Command, Element, Length, Settings, Theme};
-use iced_aw::{TabBar, TabBarStyles, TabLabel};
+use iced_aw::{SelectionList, TabBar, TabBarStyles, TabLabel};
 use image::DynamicImage;
 use load::pick_and_load_images;
 
@@ -26,6 +26,7 @@ pub enum Error {
     DialogClosed,
     ImageDecode,
     IO(io::ErrorKind),
+    Validation,
 }
 
 impl Display for Error {
@@ -47,17 +48,53 @@ enum TabId {
     Decrypt,
 }
 
+#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+enum EncMethod {
+    #[default]
+    Aaa,
+    Bbb,
+}
+
+impl Display for EncMethod {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                EncMethod::Aaa => "Aaa",
+                EncMethod::Bbb => "Bbb",
+            }
+        )
+    }
+}
+
 #[derive(Debug)]
 struct ImageData {
     image_type: TabId,
     data: DynamicImage,
 }
 
-#[derive(Default)]
+#[derive()]
 struct Imaged {
     tab_index: TabId,
     images: Option<Vec<ImageData>>,
     error: Option<Error>,
+    password: String,
+    enc_method_state: Option<EncMethod>,
+    // enc_method_state: State<EncMethod>,
+}
+
+impl Default for Imaged {
+    fn default() -> Self {
+        Self {
+            tab_index: TabId::default(),
+            images: None,
+            error: None,
+            password: "".to_string(),
+            enc_method_state: None,
+            // enc_method_state: State::new(Vec::new()),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -66,6 +103,9 @@ enum Message {
     TabSelected(TabId),
     OpenFileDialog,
     FilesOpened(Result<Arc<Vec<DynamicImage>>, Error>),
+    EncMethodSelected(usize, EncMethod),
+    PwdFieldEdited(String),
+    EncryptBtnPressed,
 }
 
 impl Application for Imaged {
@@ -117,6 +157,15 @@ impl Application for Imaged {
                 }
                 Command::none()
             }
+            Message::EncMethodSelected(_, val) => {
+                self.enc_method_state = Some(val);
+                Command::none()
+            }
+            Message::PwdFieldEdited(val) => {
+                self.password = val;
+                Command::none()
+            }
+            Message::EncryptBtnPressed => Command::none(),
         }
     }
 
@@ -134,6 +183,25 @@ impl Application for Imaged {
         })
         .on_press_maybe(None);
         let button_bar = Row::new().push(pick_file_btn).push(encrypt_btn).spacing(10);
+
+        // let select_enc_method = ComboBox::new(
+        //     &self.enc_method_state,
+        //     "hi",
+        //     Some(&EncMethod::Aaa),
+        //     Message::EncMethodSelected,
+        // );
+        let select_enc_method = SelectionList::new(
+            &[EncMethod::Aaa, EncMethod::Bbb],
+            Message::EncMethodSelected,
+        )
+        .height(Length::Shrink);
+        let password_input = TextInput::new("Enter password", self.password.as_str())
+            .on_input(Message::PwdFieldEdited);
+        let input_bar = Row::new()
+            .push(select_enc_method)
+            .push(password_input)
+            .spacing(10)
+            .width(500);
 
         let image_view = {
             let mut row = Row::new();
@@ -174,7 +242,7 @@ impl Application for Imaged {
         ))
         .padding(10);
 
-        let content = column![tab_bar, button_bar, page, error_text]
+        let content = column![tab_bar, button_bar, input_bar, page, error_text]
             .spacing(22)
             .align_items(Alignment::Center);
 
