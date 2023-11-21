@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use image::DynamicImage;
+use image::{DynamicImage, GenericImageView, Rgba, RgbaImage};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ArnoldCat {
@@ -74,7 +74,23 @@ pub trait ImageEncyptor {
 
 impl ImageEncyptor for ArnoldCat {
     fn encrypt(&self, image: DynamicImage) -> DynamicImage {
-        image
+        let mut buffer = RgbaImage::new(image.width(), image.height());
+        let rgba_image = image.to_rgba8();
+
+        for x in 0..image.width() {
+            for y in 0..image.height() {
+                let nx = (2 * x * y) % image.width();
+                let ny = (x + y) % image.height();
+
+                buffer.put_pixel(
+                    nx,
+                    image.height() - ny - 1,
+                    rgba_image.get_pixel(x, image.height() - y - 1).clone(),
+                )
+            }
+        }
+
+        DynamicImage::from(buffer)
     }
 
     fn decrypt(&self, image: DynamicImage) -> DynamicImage {
