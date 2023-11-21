@@ -11,7 +11,7 @@ use iced::{Application, Command, Element, Length, Settings, Theme};
 use iced_aw::{SelectionList, TabBar, TabBarStyles, TabLabel};
 use image::DynamicImage;
 use load::pick_and_load_images;
-use manipulate::EncMethod;
+use manipulate::{ArnoldCat, EncMethod, Henon, ImageEncyptor};
 
 mod load;
 mod manipulate;
@@ -70,6 +70,7 @@ enum Message {
 struct Imaged {
     tab_index: TabId,
     images: Option<Vec<ImageData>>,
+    res_images: Option<Vec<ImageData>>,
     error: Option<Error>,
     password: String,
     enc_method_state: Option<EncMethod>,
@@ -81,6 +82,7 @@ impl Default for Imaged {
         Self {
             tab_index: TabId::default(),
             images: None,
+            res_images: None,
             error: None,
             password: "".to_string(),
             enc_method_state: None,
@@ -156,16 +158,29 @@ impl Application for Imaged {
                 Command::none()
             }
             Message::PwdFieldEdited(val) => {
-                self.password = val;
+                self.password = val.clone();
+                self.enc_method_state =
+                    self.enc_method_state.as_ref().map(|method| match &method {
+                        EncMethod::ArnoldCat(_) => {
+                            EncMethod::ArnoldCat(Some(ArnoldCat { key: val }))
+                        }
+                        EncMethod::Henon(_) => EncMethod::Henon(Some(Henon { key: val })),
+                    });
                 Command::none()
             }
             Message::EncryptBtnPressed => {
                 if !self.password.is_empty() {
                     if let Some(method) = &self.enc_method_state {
-                        match method {
-                            EncMethod::ArnoldCat(_) => (),
-                            EncMethod::Henon => (),
-                        }
+                        let images = self.get_enc_variant_items().clone().unwrap().clone();
+                        let res = method
+                            .encrypt(images.into_iter().map(|val| val.data.clone()).collect())
+                            .into_iter()
+                            .map(|res| ImageData {
+                                data: res,
+                                image_type: self.tab_index,
+                            })
+                            .collect();
+                        self.res_images = Some(res);
                     }
                 }
 
@@ -205,7 +220,7 @@ impl Application for Imaged {
         //     Message::EncMethodSelected,
         // );
         let select_enc_method = SelectionList::new(
-            &[EncMethod::ArnoldCat(None), EncMethod::Henon],
+            &[EncMethod::ArnoldCat(None), EncMethod::Henon(None)],
             Message::EncMethodSelected,
         )
         .height(Length::Shrink);
