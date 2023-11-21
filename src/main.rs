@@ -11,6 +11,7 @@ use iced::{Application, Command, Element, Length, Settings, Theme};
 use iced_aw::{SelectionList, TabBar, TabBarStyles, TabLabel};
 use image::DynamicImage;
 use load::pick_and_load_images;
+use manipulate::EncMethod;
 
 mod load;
 mod manipulate;
@@ -48,30 +49,21 @@ enum TabId {
     Decrypt,
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-enum EncMethod {
-    #[default]
-    Aaa,
-    Bbb,
-}
-
-impl Display for EncMethod {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                EncMethod::Aaa => "Aaa",
-                EncMethod::Bbb => "Bbb",
-            }
-        )
-    }
-}
-
 #[derive(Debug)]
 struct ImageData {
     image_type: TabId,
     data: DynamicImage,
+}
+
+#[derive(Debug, Clone)]
+enum Message {
+    FontLoaded(Result<(), font::Error>),
+    TabSelected(TabId),
+    OpenFileDialog,
+    FilesOpened(Result<Arc<Vec<DynamicImage>>, Error>),
+    EncMethodSelected(usize, EncMethod),
+    PwdFieldEdited(String),
+    EncryptBtnPressed,
 }
 
 #[derive()]
@@ -97,15 +89,17 @@ impl Default for Imaged {
     }
 }
 
-#[derive(Debug, Clone)]
-enum Message {
-    FontLoaded(Result<(), font::Error>),
-    TabSelected(TabId),
-    OpenFileDialog,
-    FilesOpened(Result<Arc<Vec<DynamicImage>>, Error>),
-    EncMethodSelected(usize, EncMethod),
-    PwdFieldEdited(String),
-    EncryptBtnPressed,
+impl Imaged {
+    fn get_enc_variant_items(&self) -> Option<Vec<&ImageData>> {
+        self.images
+            .as_ref()
+            .map(|vec| {
+                vec.iter()
+                    .filter(|val| val.image_type == self.tab_index)
+                    .collect()
+            })
+            .filter(|val: &Vec<&ImageData>| !val.is_empty())
+    }
 }
 
 impl Application for Imaged {
@@ -165,7 +159,18 @@ impl Application for Imaged {
                 self.password = val;
                 Command::none()
             }
-            Message::EncryptBtnPressed => Command::none(),
+            Message::EncryptBtnPressed => {
+                if !self.password.is_empty() {
+                    if let Some(method) = &self.enc_method_state {
+                        match method {
+                            EncMethod::ArnoldCat(_) => (),
+                            EncMethod::Henon => (),
+                        }
+                    }
+                }
+
+                Command::none()
+            }
         }
     }
 
@@ -181,17 +186,26 @@ impl Application for Imaged {
             TabId::Encrypt => "Encrypt",
             TabId::Decrypt => "Decrypt",
         })
-        .on_press_maybe(None);
+        .on_press_maybe(
+            if self.enc_method_state.is_none()
+                || self.get_enc_variant_items().is_none()  // Ensure images of particular variant present
+                || self.password.is_empty()
+            {
+                None
+            } else {
+                Some(Message::EncryptBtnPressed)
+            },
+        );
         let button_bar = Row::new().push(pick_file_btn).push(encrypt_btn).spacing(10);
 
         // let select_enc_method = ComboBox::new(
         //     &self.enc_method_state,
         //     "hi",
-        //     Some(&EncMethod::Aaa),
+        //     Some(&EncMethod::ArnoldCat),
         //     Message::EncMethodSelected,
         // );
         let select_enc_method = SelectionList::new(
-            &[EncMethod::Aaa, EncMethod::Bbb],
+            &[EncMethod::ArnoldCat(None), EncMethod::Henon],
             Message::EncMethodSelected,
         )
         .height(Length::Shrink);
