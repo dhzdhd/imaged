@@ -75,25 +75,31 @@ pub trait ImageEncyptor {
 impl ImageEncyptor for ArnoldCat {
     fn encrypt(&self, image: DynamicImage) -> DynamicImage {
         let mut buffer = RgbaImage::new(image.width(), image.height());
-        let rgba_image = image.to_rgba8();
+        let mut rgba_image = image.to_rgba8();
 
-        for x in 0..image.width() {
-            for y in 0..image.height() {
-                let nx = (2 * x * y) % image.width();
-                let ny = (x + y) % image.height();
+        let width = rgba_image.width();
+        let height = rgba_image.height();
 
-                buffer.put_pixel(
-                    nx,
-                    image.height() - ny - 1,
-                    rgba_image.get_pixel(x, image.height() - y - 1).clone(),
-                )
+        for _ in 0..10 {
+            for x in 0..width {
+                for y in 0..height {
+                    let nx = (x * y) % width;
+                    let ny = (x + 2 * y) % width;
+
+                    buffer.put_pixel(x, y, rgba_image.get_pixel(nx, ny).clone());
+                }
             }
+
+            rgba_image = buffer.clone();
         }
 
-        DynamicImage::from(buffer)
+        buffer.into()
     }
 
     fn decrypt(&self, image: DynamicImage) -> DynamicImage {
+        let mut buffer = RgbaImage::new(image.width(), image.height());
+        let mut rgba_image = image.to_rgba8();
+
         image
     }
 }

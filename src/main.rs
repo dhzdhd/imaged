@@ -155,6 +155,7 @@ impl Application for Imaged {
             }
             Message::EncMethodSelected(_, val) => {
                 self.enc_method_state = Some(val);
+                self.password = "".to_string();
                 Command::none()
             }
             Message::PwdFieldEdited(val) => {
@@ -232,32 +233,32 @@ impl Application for Imaged {
             .spacing(10)
             .width(500);
 
-        // let image_view = {
-        //     let mut row = Row::new();
-        //     match &self.images {
-        //         Some(images) => {
-        //             for image in images {
-        //                 if self.tab_index == image.image_type {
-        //                     let bytes = image.data.clone();
-        //                     let image = Image::new(Handle::from_pixels(
-        //                         bytes.width(),
-        //                         bytes.height(),
-        //                         bytes.to_rgba8().to_vec(),
-        //                     ))
-        //                     .height(Length::Fill)
-        //                     .width(Length::Fill);
-        //                     row = row.push(image);
-        //                 }
-        //             }
-        //         }
-        //         None => {
-        //             row = row.push(text("No images selected"));
-        //         }
-        //     }
+        let image_view = {
+            let mut row = Row::new();
+            match &self.images {
+                Some(images) => {
+                    for image in images {
+                        if self.tab_index == image.image_type {
+                            let bytes = image.data.clone();
+                            let image = Image::new(Handle::from_pixels(
+                                bytes.width(),
+                                bytes.height(),
+                                bytes.to_rgba8().to_vec(),
+                            ))
+                            .height(Length::Fill)
+                            .width(Length::Fill);
+                            row = row.push(image);
+                        }
+                    }
+                }
+                None => {
+                    row = row.push(text("No images selected"));
+                }
+            }
 
-        //     // Scrollable::new(row)
-        //     row.align_items(Alignment::Center).spacing(5)
-        // };
+            // Scrollable::new(row)
+            row.align_items(Alignment::Center).spacing(5).height(250)
+        };
         let res_image_view = {
             let mut row: Row<'_, Message> = Row::new();
             match &self.res_images {
@@ -282,9 +283,9 @@ impl Application for Imaged {
             }
 
             // Scrollable::new(row)
-            row.align_items(Alignment::Center).spacing(5)
+            row.align_items(Alignment::Center).spacing(5).height(250)
         };
-        let page = container(column![res_image_view])
+        let page = container(column![image_view, res_image_view])
             .height(Length::Fill)
             .width(Length::Fill)
             .align_x(Horizontal::Center)
