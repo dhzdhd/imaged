@@ -8,7 +8,7 @@ use iced::widget::image::Handle;
 use iced::widget::{button, column, container, row, text, Image, Row, TextInput};
 use iced::{executor, Alignment};
 use iced::{Application, Command, Element, Length, Settings, Theme};
-use iced_aw::{SelectionList, TabBar, TabBarStyles, TabLabel};
+use iced_aw::{SelectionList, SelectionListStyles, TabBar, TabBarStyles, TabLabel};
 use image::DynamicImage;
 use load::pick_and_load_images;
 use manipulate::{ArnoldCat, EncMethod, Henon, ImageEncyptor};
@@ -74,6 +74,7 @@ struct Imaged {
     error: Option<Error>,
     password: String,
     enc_method_state: Option<EncMethod>,
+    loading: bool,
     // enc_method_state: State<EncMethod>,
 }
 
@@ -86,6 +87,7 @@ impl Default for Imaged {
             error: None,
             password: "".to_string(),
             enc_method_state: None,
+            loading: false,
             // enc_method_state: State::new(Vec::new()),
         }
     }
@@ -220,11 +222,18 @@ impl Application for Imaged {
         //     Some(&EncMethod::ArnoldCat),
         //     Message::EncMethodSelected,
         // );
-        let select_enc_method = SelectionList::new(
+        let select_enc_method = SelectionList::new_with(
             &[EncMethod::ArnoldCat(None), EncMethod::Henon(None)],
             Message::EncMethodSelected,
+            16_f32,
+            6_f32,
+            SelectionListStyles::Default,
+            None,
+            Font {
+                ..Default::default()
+            },
         )
-        .height(Length::Shrink);
+        .height(Length::Fixed(30_f32));
         let password_input = TextInput::new("Enter password", self.password.as_str())
             .on_input(Message::PwdFieldEdited);
         let input_bar = Row::new()
@@ -285,7 +294,7 @@ impl Application for Imaged {
             // Scrollable::new(row)
             row.align_items(Alignment::Center).spacing(5).height(250)
         };
-        let page = container(column![image_view, res_image_view])
+        let page = container(column![image_view, res_image_view].align_items(Alignment::Center))
             .height(Length::Fill)
             .width(Length::Fill)
             .align_x(Horizontal::Center)
