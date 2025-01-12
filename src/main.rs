@@ -5,10 +5,10 @@ use std::sync::Arc;
 use iced::alignment::{Horizontal, Vertical};
 use iced::font::{self, Font};
 use iced::widget::image::Handle;
-use iced::widget::{button, column, container, row, text, Image, Row, TextInput};
+use iced::widget::{button, column, container, row, text, Image, Row, Space, Text, TextInput};
 use iced::{executor, Alignment};
 use iced::{Application, Command, Element, Length, Settings, Theme};
-use iced_aw::{SelectionList, SelectionListStyles, TabBar, TabBarStyles, TabLabel};
+use iced_aw::{SelectionList, SelectionListStyles, Spinner, TabBar, TabBarStyles, TabLabel};
 use image::DynamicImage;
 use load::pick_and_load_images;
 use manipulate::{ArnoldCat, EncMethod, Henon, ImageEncyptor};
@@ -174,6 +174,8 @@ impl Application for Imaged {
             Message::EncryptBtnPressed => {
                 if !self.password.is_empty() {
                     if let Some(method) = &self.enc_method_state {
+                        self.loading = true;
+
                         let images = self.get_enc_variant_items().clone().unwrap().clone();
                         let res = method
                             .encrypt(images.into_iter().map(|val| val.data.clone()).collect())
@@ -184,6 +186,8 @@ impl Application for Imaged {
                             })
                             .collect();
                         self.res_images = Some(res);
+
+                        self.loading = false;
                     }
                 }
 
@@ -199,22 +203,24 @@ impl Application for Imaged {
             .set_active_tab(&self.tab_index)
             .style(TabBarStyles::Dark);
 
-        let pick_file_btn = button("Open files").on_press(Message::OpenFileDialog);
-        let encrypt_btn = button(match self.tab_index {
-            TabId::Encrypt => "Encrypt",
-            TabId::Decrypt => "Decrypt",
-        })
-        .on_press_maybe(
-            if self.enc_method_state.is_none()
+        let button_bar = {
+            let pick_file_btn = button("Open files").on_press(Message::OpenFileDialog);
+            let encrypt_btn = button(match self.tab_index {
+                TabId::Encrypt => "Encrypt",
+                TabId::Decrypt => "Decrypt",
+            })
+            .on_press_maybe(
+                if self.enc_method_state.is_none()
                 || self.get_enc_variant_items().is_none()  // Ensure images of particular variant present
                 || self.password.is_empty()
-            {
-                None
-            } else {
-                Some(Message::EncryptBtnPressed)
-            },
-        );
-        let button_bar = Row::new().push(pick_file_btn).push(encrypt_btn).spacing(10);
+                {
+                    None
+                } else {
+                    Some(Message::EncryptBtnPressed)
+                },
+            );
+            Row::new().push(pick_file_btn).push(encrypt_btn).spacing(10)
+        };
 
         // let select_enc_method = ComboBox::new(
         //     &self.enc_method_state,
@@ -222,83 +228,94 @@ impl Application for Imaged {
         //     Some(&EncMethod::ArnoldCat),
         //     Message::EncMethodSelected,
         // );
-        let select_enc_method = SelectionList::new_with(
-            &[EncMethod::ArnoldCat(None), EncMethod::Henon(None)],
-            Message::EncMethodSelected,
-            16_f32,
-            6_f32,
-            SelectionListStyles::Default,
-            None,
-            Font {
-                ..Default::default()
-            },
-        )
-        .height(Length::Fixed(30_f32));
-        let password_input = TextInput::new("Enter password", self.password.as_str())
-            .on_input(Message::PwdFieldEdited);
-        let input_bar = Row::new()
-            .push(select_enc_method)
-            .push(password_input)
-            .spacing(10)
-            .width(500);
+        let input_bar = {
+            let select_enc_method = SelectionList::new_with(
+                &[EncMethod::ArnoldCat(None), EncMethod::Henon(None)],
+                Message::EncMethodSelected,
+                16_f32,
+                6_f32,
+                SelectionListStyles::Default,
+                None,
+                Font {
+                    ..Default::default()
+                },
+            )
+            .height(Length::Fixed(30_f32));
+            let password_input = TextInput::new("Enter password", self.password.as_str())
+                .on_input(Message::PwdFieldEdited);
+            Row::new()
+                .push(select_enc_method)
+                .push(password_input)
+                .spacing(10)
+                .width(500)
+        };
 
-        let image_view = {
-            let mut row = Row::new();
-            match &self.images {
-                Some(images) => {
-                    for image in images {
-                        if self.tab_index == image.image_type {
-                            let bytes = image.data.clone();
-                            let image = Image::new(Handle::from_pixels(
-                                bytes.width(),
-                                bytes.height(),
-                                bytes.to_rgba8().to_vec(),
-                            ))
-                            .height(Length::Fill)
-                            .width(Length::Fill);
-                            row = row.push(image);
+        let page = {
+            let image_view = {
+                let mut row = Row::new();
+                match &self.images {
+                    Some(images) => {
+                        for image in images {
+                            if self.tab_index == image.image_type {
+                                let bytes = image.data.clone();
+                                let image = Image::new(Handle::from_pixels(
+                                    bytes.width(),
+                                    bytes.height(),
+                                    bytes.to_rgba8().to_vec(),
+                                ))
+                                .height(Length::Fill)
+                                .width(Length::Fill);
+                                row = row.push(image);
+                            }
                         }
                     }
-                }
-                None => {
-                    row = row.push(text("No images selected"));
-                }
-            }
-
-            // Scrollable::new(row)
-            row.align_items(Alignment::Center).spacing(5).height(250)
-        };
-        let res_image_view = {
-            let mut row: Row<'_, Message> = Row::new();
-            match &self.res_images {
-                Some(images) => {
-                    for image in images {
-                        if self.tab_index == image.image_type {
-                            let bytes = image.data.clone();
-                            let image = Image::new(Handle::from_pixels(
-                                bytes.width(),
-                                bytes.height(),
-                                bytes.to_rgba8().to_vec(),
-                            ))
-                            .height(Length::Fill)
-                            .width(Length::Fill);
-                            row = row.push(image);
-                        }
+                    None => {
+                        row = row.push(text("No images selected"));
                     }
                 }
-                None => {
-                    row = row.push(text("No results yet"));
-                }
-            }
 
-            // Scrollable::new(row)
-            row.align_items(Alignment::Center).spacing(5).height(250)
+                // Scrollable::new(row)
+                row.align_items(Alignment::Center).spacing(5).height(250)
+            };
+            let res_image_view = {
+                let mut row: Row<'_, Message> = Row::new();
+                match &self.res_images {
+                    Some(images) => {
+                        for image in images {
+                            if self.tab_index == image.image_type {
+                                let bytes = image.data.clone();
+                                let image = Image::new(Handle::from_pixels(
+                                    bytes.width(),
+                                    bytes.height(),
+                                    bytes.to_rgba8().to_vec(),
+                                ))
+                                .height(Length::Fill)
+                                .width(Length::Fill);
+                                row = row.push(image);
+                            }
+                        }
+                    }
+                    None => {
+                        row = row.push(text("No results yet"));
+                    }
+                }
+
+                // Scrollable::new(row)
+                row.align_items(Alignment::Center).spacing(5).height(250)
+            };
+            container(column![image_view, res_image_view].align_items(Alignment::Center))
+                .height(Length::Fill)
+                .width(Length::Fill)
+                .align_x(Horizontal::Center)
+                .align_y(Vertical::Center)
         };
-        let page = container(column![image_view, res_image_view].align_items(Alignment::Center))
-            .height(Length::Fill)
-            .width(Length::Fill)
-            .align_x(Horizontal::Center)
-            .align_y(Vertical::Center);
+
+        let spinner: Element<Message> = if self.loading {
+            Spinner::new().into()
+        } else {
+            // Space::new(Length::Shrink, Length::Fixed(5_f32)).into()
+            Text::new(format!("{}", self.loading)).into()
+        };
 
         let error_text = container(text(
             self.error
@@ -308,7 +325,7 @@ impl Application for Imaged {
         ))
         .padding(10);
 
-        let content = column![tab_bar, button_bar, input_bar, page, error_text]
+        let content = column![tab_bar, button_bar, input_bar, page, spinner, error_text]
             .spacing(22)
             .align_items(Alignment::Center);
 

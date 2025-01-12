@@ -79,12 +79,13 @@ impl ImageEncyptor for ArnoldCat {
 
         let width = rgba_image.width();
         let height = rgba_image.height();
+        let n = width.min(height);
 
         for _ in 0..10 {
             for x in 0..width {
                 for y in 0..height {
-                    let nx = (x * y) % width;
-                    let ny = (x + 2 * y) % width;
+                    let nx = (x * y) % n;
+                    let ny = (x + 2 * y) % n;
 
                     buffer.put_pixel(x, y, rgba_image.get_pixel(nx, ny).clone());
                 }
